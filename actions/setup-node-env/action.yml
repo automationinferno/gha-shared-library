@@ -1,0 +1,53 @@
+name: 'Setup Node Environment'
+description: 'Shared utility action: installs Node.js, configures npm caching, and runs clean dependency install.'
+
+inputs:
+  node-version:
+    description: 'Node.js version to set up'
+    required: false
+    default: '20'
+  node-version-file:
+    description: 'Path to file containing Node.js version (.nvmrc or .node-version)'
+    required: false
+    default: ''
+  working-directory:
+    description: 'Working directory containing package.json and lockfile'
+    required: false
+    default: '.'
+  cache-dependency-path:
+    description: 'Path to package-lock.json or npm-shrinkwrap.json for cache key calculation'
+    required: false
+    default: ''
+
+outputs:
+  node-version:
+    description: 'The Node.js version installed'
+    value: ${{ steps.setup-node.outputs.node-version }}
+  cache-hit:
+    description: 'Whether npm cache hit occurred'
+    value: ${{ steps.setup-node.outputs.cache-hit }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node.js runtime and npm cache
+      id: setup-node
+      uses: actions/setup-node@0a44ba7841725637a54e280ec667c276c6ce8129 # v4.0.4
+      with:
+        node-version: ${{ inputs.node-version-file == '' && inputs.node-version || '' }}
+        node-version-file: ${{ inputs.node-version-file != '' && inputs.node-version-file || '' }}
+        cache: 'npm'
+        cache-dependency-path: ${{ inputs.cache-dependency-path != '' && inputs.cache-dependency-path || (inputs.working-directory != '.' && format('{0}/package-lock.json', inputs.working-directory) || 'package-lock.json') }}
+
+    - name: Install dependencies with clean install
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        if [ -f "package-lock.json" ] || [ -f "npm-shrinkwrap.json" ]; then
+          echo "Found lockfile. Running npm ci..."
+          npm ci
+        else
+          echo "No lockfile found. Falling back to npm install..."
+          npm install
+        fi

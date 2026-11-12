@@ -1,0 +1,60 @@
+name: 'Build Summary Generator'
+description: 'Shared utility action: generates a standardized GitHub Actions Step Summary for CI runs.'
+
+inputs:
+  title:
+    description: 'Header title for the summary'
+    required: false
+    default: 'CI Build Summary'
+  node-version:
+    description: 'Node version used'
+    required: false
+    default: ''
+  test-result:
+    description: 'Test result status (e.g. success, skipped, failure)'
+    required: false
+    default: 'success'
+  lint-result:
+    description: 'Lint result status'
+    required: false
+    default: 'success'
+  build-result:
+    description: 'Build result status'
+    required: false
+    default: 'success'
+  details:
+    description: 'Additional markdown details or notes'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Emit GitHub step summary
+      shell: bash
+      env:
+        SUMMARY_TITLE: ${{ inputs.title }}
+        NODE_VER: ${{ inputs.node-version }}
+        TEST_STATUS: ${{ inputs.test-result }}
+        LINT_STATUS: ${{ inputs.lint-result }}
+        BUILD_STATUS: ${{ inputs.build-result }}
+        DETAILS: ${{ inputs.details }}
+      run: |
+        set -euo pipefail
+        {
+          echo "## $SUMMARY_TITLE"
+          echo ""
+          echo "| Check / Component | Status | Details |"
+          echo "| :--- | :--- | :--- |"
+          echo "| **Node.js Environment** | :white_check_mark: Configured | \`$NODE_VER\` |"
+          echo "| **Lint Verification** | $([ "$LINT_STATUS" = "success" ] && echo ":white_check_mark: Passed" || echo ":warning: $LINT_STATUS") | Standard rules |"
+          echo "| **Automated Unit Tests** | $([ "$TEST_STATUS" = "success" ] && echo ":white_check_mark: Passed" || echo ":warning: $TEST_STATUS") | Test suite executed |"
+          echo "| **Artifact / Build** | $([ "$BUILD_STATUS" = "success" ] && echo ":white_check_mark: Passed" || echo ":warning: $BUILD_STATUS") | Application compiled |"
+          echo ""
+          if [ -n "$DETAILS" ]; then
+            echo "### Notes"
+            echo "$DETAILS"
+            echo ""
+          fi
+          echo "*Standardized via [automationinferno/gha-shared-library](https://github.com/automationinferno/gha-shared-library)*"
+        } >> "$GITHUB_STEP_SUMMARY"
