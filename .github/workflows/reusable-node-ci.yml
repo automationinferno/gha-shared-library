@@ -7,7 +7,7 @@ on:
         description: 'Node.js version to test against (ignored if node-version-file is set)'
         required: false
         type: string
-        default: '20'
+        default: ''
       node-version-file:
         description: 'Path to .nvmrc or .node-version file'
         required: false
@@ -92,7 +92,7 @@ jobs:
         uses: automationinferno/gha-shared-library/actions/build-summary@v1
         with:
           title: 'Node.js CI Verification'
-          node-version: ${{ inputs.node-version-file != '' && format('from file {0}', inputs.node-version-file) || inputs.node-version }}
+          node-version: ${{ inputs.node-version }}
           lint-result: ${{ inputs.run-lint && 'success' || 'skipped' }}
           test-result: ${{ inputs.run-test && 'success' || 'skipped' }}
           build-result: ${{ inputs.run-build && 'success' || 'skipped' }}
