@@ -57,11 +57,22 @@ jobs:
 
       - name: Setup Node environment via shared composite action
         id: setup
-        uses: automationinferno/gha-shared-library/actions/setup-node-env@v1
+        uses: actions/setup-node@0a44ba7841725637a54e280ec667c276c6ce8129 # v4.0.4
         with:
           node-version: ${{ inputs.node-version }}
           node-version-file: ${{ inputs.node-version-file }}
-          working-directory: ${{ inputs.working-directory }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          set -euo pipefail
+          if [ -f "package-lock.json" ] || [ -f "npm-shrinkwrap.json" ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Run code linter
         if: ${{ inputs.run-lint }}
@@ -87,15 +98,27 @@ jobs:
           set -euo pipefail
           npm run build
 
-      - name: Generate build summary via shared composite action
+      - name: Generate build summary
         if: always()
-        uses: automationinferno/gha-shared-library/actions/build-summary@v1
-        with:
-          title: 'Node.js CI Verification'
-          node-version: ${{ inputs.node-version }}
-          lint-result: ${{ inputs.run-lint && 'success' || 'skipped' }}
-          test-result: ${{ inputs.run-test && 'success' || 'skipped' }}
-          build-result: ${{ inputs.run-build && 'success' || 'skipped' }}
+        shell: bash
+        env:
+          TITLE: 'Node.js CI Verification'
+          TEST_STATUS: ${{ inputs.run-test && 'success' || 'skipped' }}
+          LINT_STATUS: ${{ inputs.run-lint && 'success' || 'skipped' }}
+          BUILD_STATUS: ${{ inputs.run-build && 'success' || 'skipped' }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## $TITLE"
+            echo ""
+            echo "| Check | Status |"
+            echo "| :--- | :--- |"
+            echo "| Lint | $LINT_STATUS |"
+            echo "| Test | $TEST_STATUS |"
+            echo "| Build | $BUILD_STATUS |"
+            echo ""
+            echo "*Standardized via automationinferno/gha-shared-library*"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record pipeline output status
         id: record-status
