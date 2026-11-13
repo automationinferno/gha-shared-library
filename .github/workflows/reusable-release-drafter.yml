@@ -50,7 +50,7 @@ jobs:
           echo "Successfully loaded central release-drafter config from ${{ inputs.shared-lib-repo }}@${{ inputs.shared-lib-ref }}"
 
       - name: Run Release Drafter
-        uses: release-drafter/release-drafter@b1476f6e6eb133aff61ed73625e953a9e6561332 # v6.1.0
+        uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
         with:
           config-name: release-drafter.yml
         env:
