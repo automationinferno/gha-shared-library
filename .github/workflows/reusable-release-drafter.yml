@@ -1,0 +1,57 @@
+name: Reusable Release Drafter
+
+on:
+  workflow_call:
+    inputs:
+      config-name:
+        description: 'Path or name of release-drafter config file in the shared library repository'
+        required: false
+        type: string
+        default: 'release-drafter.yml'
+      shared-lib-repo:
+        description: 'Repository hosting the shared release-drafter configuration'
+        required: false
+        type: string
+        default: 'automationinferno/gha-shared-library'
+      shared-lib-ref:
+        description: 'Git ref to fetch release-drafter configuration from'
+        required: false
+        type: string
+        default: 'v1'
+
+permissions: {}
+
+jobs:
+  draft-release:
+    name: Draft Release Notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Fetch central release-drafter configuration
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ inputs.shared-lib-repo }}
+          ref: ${{ inputs.shared-lib-ref }}
+          sparse-checkout: |
+            .github/${{ inputs.config-name }}
+          sparse-checkout-cone-mode: false
+          path: .github-shared
+          persist-credentials: false
+
+      - name: Copy central config into workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github
+          cp ".github-shared/.github/${{ inputs.config-name }}" .github/release-drafter.yml
+          echo "Successfully loaded central release-drafter config from ${{ inputs.shared-lib-repo }}@${{ inputs.shared-lib-ref }}"
+
+      - name: Run Release Drafter
+        uses: release-drafter/release-drafter@b1476f6e6eb133aff61ed73625e953a9e6561332 # v6.1.0
+        with:
+          config-name: release-drafter.yml
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

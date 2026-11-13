@@ -1,0 +1,51 @@
+name: Reusable Release Publisher
+
+on:
+  workflow_call:
+    inputs:
+      stack:
+        description: 'Target stack: node, maven, or generic'
+        required: false
+        type: string
+        default: 'generic'
+
+permissions: {}
+
+jobs:
+  publish-release:
+    name: Publish Release Artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Log Release Information
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Processing published release: ${{ github.ref_name }}"
+          echo "Release Tag: ${{ github.event.release.tag_name || github.ref_name }}"
+          echo "Target Stack: ${{ inputs.stack }}"
+
+      - name: Record Release Step Summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Release Published: ${{ github.event.release.tag_name || github.ref_name }}"
+            echo ""
+            echo "| Field | Value |"
+            echo "| :--- | :--- |"
+            echo "| **Release Name** | ${{ github.event.release.name || github.ref_name }} |"
+            echo "| **Tag** | \`${{ github.event.release.tag_name || github.ref_name }}\` |"
+            echo "| **Stack** | \`${{ inputs.stack }}\` |"
+            echo ""
+            echo "Successfully orchestrated via \`automationinferno/gha-shared-library\`"
+          } >> "$GITHUB_STEP_SUMMARY"
