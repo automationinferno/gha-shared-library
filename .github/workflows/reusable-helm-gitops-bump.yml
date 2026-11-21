@@ -1,0 +1,94 @@
+name: Reusable Helm GitOps Bump
+
+on:
+  workflow_call:
+    inputs:
+      gitops-repo:
+        description: 'Target GitOps repository in owner/repo format (e.g. moralerr/helm-charts)'
+        required: true
+        type: string
+      gitops-branch:
+        description: 'Target branch in the GitOps repository'
+        required: false
+        type: string
+        default: 'main'
+      values-file:
+        description: 'Path to Helm values.yaml inside the GitOps repository'
+        required: true
+        type: string
+      yq-path:
+        description: 'yq expression for the field to update (default .image.tag)'
+        required: false
+        type: string
+        default: '.image.tag'
+      image-tag:
+        description: 'New image tag value to write'
+        required: true
+        type: string
+      commit-message:
+        description: 'Commit message for the GitOps update (defaults to a generated message)'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      GITOPS_TOKEN:
+        description: 'Token with push access to the target GitOps repository'
+        required: true
+
+permissions: {}
+
+jobs:
+  update-helm-chart:
+    name: Update Helm Chart Image Tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.gitops-repo }}
+          ref: ${{ inputs.gitops-branch }}
+          token: ${{ secrets.GITOPS_TOKEN }}
+          persist-credentials: true
+
+      - name: Update values file and push commit
+        shell: bash
+        env:
+          VALUES_FILE: ${{ inputs.values-file }}
+          YQ_PATH: ${{ inputs.yq-path }}
+          IMAGE_TAG: ${{ inputs.image-tag }}
+          GITOPS_BRANCH: ${{ inputs.gitops-branch }}
+          COMMIT_MESSAGE: ${{ inputs.commit-message }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! -f "$VALUES_FILE" ]]; then
+            echo "Values file not found: $VALUES_FILE" >&2
+            exit 1
+          fi
+
+          # Allow only simple dotted YAML key paths (e.g. .image.tag)
+          if [[ ! "$YQ_PATH" =~ ^(\.[A-Za-z0-9_-]+)+$ ]]; then
+            echo "Unsupported yq path: $YQ_PATH" >&2
+            exit 1
+          fi
+
+          yq eval "${YQ_PATH} = strenv(IMAGE_TAG)" -i "$VALUES_FILE"
+
+          if git diff --quiet -- "$VALUES_FILE"; then
+            echo "No changes detected in $VALUES_FILE; skipping commit."
+            exit 0
+          fi
+
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          if [[ -z "$COMMIT_MESSAGE" ]]; then
+            COMMIT_MESSAGE="chore(gitops): update ${VALUES_FILE} image tag to ${IMAGE_TAG}"
+          fi
+
+          git add -- "$VALUES_FILE"
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin "HEAD:${GITOPS_BRANCH}"
