@@ -25,21 +25,25 @@ In GitHub Actions, there is no single monolithic "Groovy library" runtime. Inste
 automationinferno/gha-shared-library/
 ├── .github/
 │   └── workflows/
-│       └── reusable-node-ci.yml      <-- Reusable Workflow (Pipeline Template)
+│       ├── reusable-node-ci.yml          <-- Reusable Workflow (Node.js lint, test, build)
+│       ├── reusable-docker-build-push.yml <-- Reusable Workflow (Buildx image build/push)
+│       ├── reusable-helm-gitops-bump.yml  <-- Reusable Workflow (Helm values.yaml GitOps bump)
+│       ├── reusable-release-drafter.yml   <-- Reusable Workflow (Release Drafter)
+│       └── reusable-release-publish.yml   <-- Reusable Workflow (Release Publish)
 ├── actions/
-│   ├── setup-node-env/               <-- Composite Action (Custom Step: Node + cache + clean install)
+│   ├── setup-node-env/                   <-- Composite Action (Custom Step: Node + cache + clean install)
 │   │   └── action.yml
-│   └── build-summary/                <-- Composite Action (Custom Step: Writes $GITHUB_STEP_SUMMARY)
+│   └── build-summary/                    <-- Composite Action (Custom Step: Writes $GITHUB_STEP_SUMMARY)
 │       └── action.yml
 └── README.md
 ```
 
-### Layer 1: Reusable Workflow (`workflow_call`)
-Defined in `.github/workflows/reusable-node-ci.yml`:
-- Acts as the central pipeline contract.
-- Declares input parameters (`node-version`, `run-lint`, `run-test`, `run-build`).
-- Enforces baseline security: `permissions: {}` at root, explicit scoped permissions per job, and execution `timeout-minutes`.
-- Composes the step-level utilities from `actions/`.
+### Layer 1: Reusable Workflows (`workflow_call`)
+- **`.github/workflows/reusable-node-ci.yml`**: Standard Node.js CI (`lint` -> `test` -> `build`) with `permissions: {}` at root, `contents: read` on the job, and `timeout-minutes: 15`.
+- **`.github/workflows/reusable-docker-build-push.yml`**: Builds and optionally pushes container images with Docker Buildx, optional QEMU cross-platform emulation, GitHub Actions Buildx cache (`type=gha`), and `digest` output (`contents: read` on caller job; `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` secrets when `push: true`).
+- **`.github/workflows/reusable-helm-gitops-bump.yml`**: Checks out a target GitOps repository using `GITOPS_TOKEN`, updates a validated dotted YAML key path (default `.image.tag`) in a Helm `values.yaml` via `yq`, and commits/pushes if changed (`contents: read` on caller job).
+- **`.github/workflows/reusable-release-drafter.yml`**: Drafts release notes using the organization default config in `automationinferno/.github` (`contents: write`, `pull-requests: read` on caller job).
+- **`.github/workflows/reusable-release-publish.yml`**: Orchestrates release publication hooks on published GitHub Releases (`contents: read`, `packages: write` on caller job).
 
 ### Layer 2: Composite Actions (The "vars/ Custom Steps")
 - **`actions/setup-node-env`**: Standardizes `actions/setup-node`, npm caching keys, and lockfile execution (`npm ci`).
